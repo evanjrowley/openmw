@@ -2,6 +2,7 @@
 
 #include <sstream>
 
+#include <osg/BlendFunc>
 #include <osg/ClipNode>
 #include <osg/Depth>
 #include <osg/Fog>
@@ -569,6 +570,15 @@ namespace MWRender
     {
         osg::ref_ptr<osg::StateSet> stateset = SceneUtil::createSimpleWaterStateSet(alpha, MWRender::RenderBin_Water);
 
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_WETWORLD_WATER_MASK
+        // Preserve normal RGB blending and force only scene alpha to zero.
+        stateset->setAttributeAndModes(
+            new osg::BlendFunc(osg::BlendFunc::SRC_ALPHA, osg::BlendFunc::ONE_MINUS_SRC_ALPHA,
+                osg::BlendFunc::ZERO, osg::BlendFunc::ZERO),
+            osg::StateAttribute::ON);
+#endif
+
         node->setStateSet(stateset);
         node->setUpdateCallback(nullptr);
         mRainSettingsUpdater = nullptr;
@@ -637,6 +647,14 @@ namespace MWRender
             else
             {
                 stateset->setMode(GL_BLEND, osg::StateAttribute::ON);
+#ifdef ANDROID
+                // OPENMW_ANDROID_051_WETWORLD_WATER_MASK
+                // Preserve source-alpha RGB while reserving scene alpha 0.
+                stateset->setAttributeAndModes(
+                    new osg::BlendFunc(osg::BlendFunc::SRC_ALPHA, osg::BlendFunc::ONE_MINUS_SRC_ALPHA,
+                        osg::BlendFunc::ZERO, osg::BlendFunc::ZERO),
+                    osg::StateAttribute::ON);
+#endif
                 stateset->setRenderBinDetails(MWRender::RenderBin_Water, "RenderBin");
                 osg::ref_ptr<osg::Depth> depth = new SceneUtil::AutoDepth;
                 depth->setWriteMask(false);
@@ -686,6 +704,11 @@ namespace MWRender
         defineMap["rippleMapSize"] = std::to_string(RipplesSurface::sRTTSize) + ".0";
         defineMap["sunlightScattering"] = Settings::water().mSunlightScattering ? "1" : "0";
         defineMap["wobblyShores"] = Settings::water().mWobblyShores ? "1" : "0";
+#ifdef ANDROID
+        defineMap["wetWorldWaterMask"] = "1";
+#else
+        defineMap["wetWorldWaterMask"] = "0";
+#endif
 
         Stereo::shaderStereoDefines(defineMap);
 

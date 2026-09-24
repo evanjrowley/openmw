@@ -259,8 +259,16 @@ namespace MWRender
         bool mPrevPassLights = false;
 
         int mGLSLVersion;
+        // OPENMW_ANDROID_051_GATE_G_PP_INIT
+#ifdef ANDROID
+        // Safe defaults; Android assigns the live GraphicsContext size before
+        // the first PP viewport/textures/FBOs are constructed.
+        int mWidth = 0;
+        int mHeight = 0;
+#else
         int mWidth;
         int mHeight;
+#endif
         int mSamples;
 
         osg::ref_ptr<Fx::StateUpdater> mStateUpdater;

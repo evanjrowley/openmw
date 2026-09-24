@@ -487,6 +487,14 @@ void OMW::Engine::setSkipMenu(bool skipMenu, bool newGame)
     mNewGame = newGame;
 }
 
+#ifdef ANDROID
+// OPENMW_ANDROID_051_RUNTIME_BASELINE
+// Shared with androidmain.cpp. Android can destroy/recreate the Surface while
+// the native OpenMW process and viewer remain alive.
+osg::ref_ptr<osgViewer::Viewer> g_viewer;
+bool g_androidWindowManagerReady = false;
+#endif
+
 void OMW::Engine::createWindow()
 {
     const int screen = Settings::video().mScreen;
@@ -693,6 +701,11 @@ void OMW::Engine::createWindow()
 
     mViewer->getEventQueue()->getCurrentEventState()->setWindowRectangle(
         0, 0, graphicsWindow->getTraits()->width, graphicsWindow->getTraits()->height);
+
+#ifdef ANDROID
+    // Keep a strong viewer reference for the Java Surface lifecycle bridge.
+    g_viewer = mViewer;
+#endif
 }
 
 void OMW::Engine::setWindowIcon()
@@ -824,6 +837,9 @@ void OMW::Engine::prepareEngine()
         mWorkQueue.get(), mCfgMgr.getLogPath(), mScriptConsoleMode, mTranslationDataStorage, mEncoding, mExportFonts,
         Version::getOpenmwVersionDescription(), mCfgMgr);
     mEnvironment.setWindowManager(*mWindowManager);
+#ifdef ANDROID
+    g_androidWindowManagerReady = true;
+#endif
 
     mInputManager = std::make_unique<MWInput::InputManager>(mWindow, mViewer, mScreenCaptureHandler, keybinderUser,
         keybinderUserExists, userGameControllerdb, gameControllerdb, mGrab);
@@ -1069,6 +1085,11 @@ void OMW::Engine::go()
     }
 
     mLuaWorker->join();
+
+#ifdef ANDROID
+    g_androidWindowManagerReady = false;
+    g_viewer.release();
+#endif
 
     // Save user settings
     Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");

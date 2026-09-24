@@ -279,6 +279,14 @@ namespace MWGui
 
     void LoadingScreen::setupCopyFramebufferToTextureCallback()
     {
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_LOADINGSCREEN_NO_FB_COPY
+        // glCopyTexImage2D from the live default framebuffer is unreliable on
+        // the Android GL4ES path during loading transitions. Keep the normal
+        // loading UI but skip only this scene-background capture.
+        return;
+#endif
+
         // Copy the current framebuffer onto a texture and display that texture as the background image
         // Note, we could also set the camera to disable clearing and have the background image transparent,
         // but then we get shaking effects on buffer swaps.

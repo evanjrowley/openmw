@@ -63,6 +63,11 @@ namespace Fx
 
         void setSunVis(float vis) { mData.get<SunVis>() = vis; }
 
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_CPU_SUN_OCCLUSION
+        void setSunOcclusion(float visibility) { mData.get<SunOcclusion>() = visibility; }
+#endif
+
         void setFogRange(float near, float far)
         {
             mData.get<FogNear>() = near;
@@ -226,6 +231,13 @@ namespace Fx
             static constexpr std::string_view sName = "sunVis";
         };
 
+#ifdef ANDROID
+        struct SunOcclusion : Std140::Float
+        {
+            static constexpr std::string_view sName = "sunOcclusion";
+        };
+#endif
+
         struct WaterHeight : Std140::Float
         {
             static constexpr std::string_view sName = "waterHeight";
@@ -283,8 +295,12 @@ namespace Fx
 
         using UniformData = Std140::UBO<ProjectionMatrix, InvProjectionMatrix, ViewMatrix, PrevViewMatrix,
             InvViewMatrix, EyePos, EyeVec, FogColor, AmbientColor, SkyColor, SunColor, SunPos, SunVec, Resolution,
-            RcpResolution, FogNear, FogFar, Near, Far, Fov, GameHour, SunVis, WaterHeight, IsWaterEnabled,
-            SimulationTime, DeltaSimulationTime, FrameNumber, WindSpeed, WeatherTransition, WeatherID, NextWeatherID,
+            RcpResolution, FogNear, FogFar, Near, Far, Fov, GameHour, SunVis,
+#ifdef ANDROID
+            SunOcclusion,
+#endif
+            WaterHeight, IsWaterEnabled, SimulationTime, DeltaSimulationTime, FrameNumber, WindSpeed, WeatherTransition,
+            WeatherID, NextWeatherID,
             IsUnderwater, IsInterior>;
 
         UniformData mData;

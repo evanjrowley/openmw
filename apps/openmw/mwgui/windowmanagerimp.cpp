@@ -1316,8 +1316,16 @@ namespace MWGui
 
     void WindowManager::windowResized(int x, int y)
     {
+#ifndef ANDROID
         Settings::video().mResolutionX.set(x);
         Settings::video().mResolutionY.set(y);
+#else
+        // OPENMW_ANDROID_051_LOGICAL_RENDER_RESOLUTION
+        // SDL reports the physical Android Surface here. Do not overwrite the
+        // launcher-selected logical render size with that physical size.
+        (void)x;
+        (void)y;
+#endif
 
         // We only want to process changes to window-size related settings.
         Settings::CategorySettingVector filter = { { "Video", "resolution x" }, { "Video", "resolution y" } };
@@ -1918,7 +1926,16 @@ namespace MWGui
 
     bool WindowManager::getCursorVisible()
     {
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_ABSOLUTE_TOUCH_CURSOR
+        // Keep SDL's menu cursor logically visible even while controller-menu
+        // navigation marks the MyGUI cursor inactive. The Android absolute-touch
+        // bridge uses SDL_ShowCursor(SDL_QUERY) to decide whether a finger-down
+        // may start a menu interaction.
+        return mCursorVisible;
+#else
         return mCursorVisible && mCursorActive;
+#endif
     }
 
     void WindowManager::trackWindow(Layout* layout, const WindowSettingValues& settings)

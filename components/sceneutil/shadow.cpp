@@ -75,6 +75,13 @@ namespace SceneUtil
             mShadowTechnique->disableFrontFaceCulling();
 
         mShadowSettings->setMultipleShadowMapHint(osgShadow::ShadowSettings::CASCADED);
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_ORTHOGRAPHIC_SHADOW_MAP
+        // GL4ES/GLES2 stability: avoid the view/light-angle-dependent LiSPSM
+        // perspective projection. Preserve the existing single map, distance,
+        // resolution and fade settings; only the shadow projection changes.
+        mShadowSettings->setShadowMapProjectionHint(osgShadow::ShadowSettings::ORTHOGRAPHIC_SHADOW_MAP);
+#endif
 
         if (settings.mEnableDebugHud)
             mShadowTechnique->enableDebugHUD();
@@ -88,13 +95,28 @@ namespace SceneUtil
             return;
 
         osg::ref_ptr<osg::Image> fakeShadowMapImage = new osg::Image();
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_GLES2_MANUAL_SHADOW_COMPARE
+        // Raw sampler2D receivers need a white texel for an always-unshadowed
+        // fallback and must not rely on desktop depth-compare texture state.
+        fakeShadowMapImage->allocateImage(1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE);
+        fakeShadowMapImage->data()[0] = 0xFF;
+        fakeShadowMapImage->data()[1] = 0xFF;
+        fakeShadowMapImage->data()[2] = 0xFF;
+        fakeShadowMapImage->data()[3] = 0xFF;
+#else
         fakeShadowMapImage->allocateImage(1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT);
         *(float*)fakeShadowMapImage->data() = std::numeric_limits<float>::infinity();
+#endif
         osg::ref_ptr<osg::Texture> fakeShadowMapTexture = new osg::Texture2D(fakeShadowMapImage);
         fakeShadowMapTexture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
         fakeShadowMapTexture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+#ifdef ANDROID
+        fakeShadowMapTexture->setShadowComparison(false);
+#else
         fakeShadowMapTexture->setShadowComparison(true);
         fakeShadowMapTexture->setShadowCompareFunc(osg::Texture::ShadowCompareFunc::ALWAYS);
+#endif
         for (unsigned int i = mShadowSettings->getBaseShadowTextureUnit();
              i < mShadowSettings->getBaseShadowTextureUnit() + mShadowSettings->getNumShadowMapsPerLight(); ++i)
         {

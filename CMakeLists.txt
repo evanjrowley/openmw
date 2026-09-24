@@ -74,6 +74,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/)
 
 if (ANDROID)
     set(CMAKE_FIND_ROOT_PATH ${OPENMW_DEPENDENCIES_DIR} "${CMAKE_FIND_ROOT_PATH}")
+    # libc++ dropped the char_traits primary template; MyGUI's UString needs it.
+    # CXX flags only: the header pulls in C++ headers, C sources must not see it.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -include ${CMAKE_SOURCE_DIR}/extern/android_char_traits_fix.h")
 endif()
 
 # Version
@@ -296,7 +299,6 @@ set(USED_OSG_COMPONENTS
     )
 set(USED_OSG_PLUGINS
     osgdb_bmp
-    osgdb_dae
     osgdb_dds
     osgdb_freetype
     osgdb_jpeg
@@ -304,6 +306,12 @@ set(USED_OSG_PLUGINS
     osgdb_png
     osgdb_serializers_osg
     osgdb_tga)
+
+# On Android we skip the COLLADA plugin: it would require collada-dom and
+# boost filesystem/system cross-built, for a format Morrowind never uses.
+if(NOT ANDROID)
+    list(APPEND USED_OSG_PLUGINS osgdb_dae)
+endif()
 
 if(NOT COLLADA_DOM_VERSION_MAJOR)
     set(COLLADA_DOM_VERSION_MAJOR 2)

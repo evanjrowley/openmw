@@ -1,3 +1,19 @@
+// OPENMW_ANDROID_051_GL4ES_EXPLICIT_OBJECT_FOG
+#ifdef OPENMW_ANDROID_051_GL4ES_EXPLICIT_OBJECT_FOG
+uniform vec4 omwFogColor;
+uniform float omwFogStart;
+uniform float omwFogEnd;
+#define OPENMW_FOG_START omwFogStart
+#define OPENMW_FOG_END omwFogEnd
+#define OPENMW_FOG_SCALE (1.0 / max(omwFogEnd - omwFogStart, 0.0001))
+#define OPENMW_FOG_COLOR omwFogColor
+#else
+#define OPENMW_FOG_START gl_Fog.start
+#define OPENMW_FOG_END gl_Fog.end
+#define OPENMW_FOG_SCALE gl_Fog.scale
+#define OPENMW_FOG_COLOR gl_Fog.color
+#endif
+
 #if @skyBlending
 #include "lib/core/fragment.h.glsl"
 
@@ -12,14 +28,14 @@ vec4 applyFogAtDist(vec4 color, float euclideanDist, float linearDist, float far
     float dist = abs(linearDist);
 #endif
 #if @exponentialFog
-    float fogValue = 1.0 - exp(-2.0 * max(0.0, dist - gl_Fog.start/2.0) / (gl_Fog.end - gl_Fog.start/2.0));
+    float fogValue = 1.0 - exp(-2.0 * max(0.0, dist - OPENMW_FOG_START/2.0) / (OPENMW_FOG_END - OPENMW_FOG_START/2.0));
 #else
-    float fogValue = clamp((dist - gl_Fog.start) * gl_Fog.scale, 0.0, 1.0);
+    float fogValue = clamp((dist - OPENMW_FOG_START) * OPENMW_FOG_SCALE, 0.0, 1.0);
 #endif
 #ifdef ADDITIVE_BLENDING
     color.xyz *= 1.0 - fogValue;
 #else
-    color.xyz = mix(color.xyz, gl_Fog.color.xyz, fogValue);
+    color.xyz = mix(color.xyz, OPENMW_FOG_COLOR.xyz, fogValue);
 #endif
 
 #if @skyBlending

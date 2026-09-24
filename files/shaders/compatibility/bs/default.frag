@@ -83,7 +83,7 @@ void main()
     vec3 viewNormal = normalToView(normal);
     specularColor *= normalTex.a;
 #else
-    vec3 viewNormal = normalize(gl_NormalMatrix * passNormal);
+    vec3 viewNormal = normalToView(normalize(passNormal));
 #endif
 
     float shadowing = unshadowedLightRatio(linearDepth);

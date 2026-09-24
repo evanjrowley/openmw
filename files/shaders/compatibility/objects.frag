@@ -85,9 +85,10 @@ varying vec3 passNormal;
 varying vec4 passTangent;
 #endif
 
-#if @additiveBlending
-#define ADDITIVE_BLENDING
-#endif
+// OPENMW_ANDROID_051_GL4ES_DISABLE_ADDITIVE_FOG
+// Android/GL4ES compatibility: do not select compatibility/fog.glsl's
+// additive branch for ordinary objects; it fades object RGB toward black.
+// This matches the proven OpenMW 0.50 Android GL4ES behaviour.
 
 #include "lib/core/fragment.h.glsl"
 #include "lib/light/lighting.glsl"
@@ -95,6 +96,9 @@ varying vec4 passTangent;
 #include "lib/material/alpha.glsl"
 #include "lib/util/distortion.glsl"
 
+// Android/GL4ES Patch 7: use authoritative OpenMW fog uniforms instead of
+// compatibility gl_Fog built-ins for ordinary NIF/object shaders only.
+#define OPENMW_ANDROID_051_GL4ES_EXPLICIT_OBJECT_FOG
 #include "fog.glsl"
 #include "vertexcolors.glsl"
 #include "shadows_fragment.glsl"
@@ -170,7 +174,7 @@ vec2 screenCoords = gl_FragCoord.xy / screenRes;
 #endif
     vec3 viewNormal = normalToView(normal);
 #else
-    vec3 viewNormal = normalize(gl_NormalMatrix * passNormal);
+    vec3 viewNormal = normalToView(normalize(passNormal));
 #endif
 
     vec3 viewVec = normalize(passViewPos);

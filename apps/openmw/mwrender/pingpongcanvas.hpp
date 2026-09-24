@@ -67,6 +67,10 @@ namespace MWRender
         osg::ref_ptr<osg::Program> mMultiviewResolveProgram;
         osg::ref_ptr<osg::StateSet> mFallbackStateSet;
         osg::ref_ptr<osg::StateSet> mMultiviewResolveStateSet;
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_FINAL_GAMMA
+        osg::ref_ptr<osg::StateSet> mAndroidGammaStateSet;
+#endif
 
         osg::ref_ptr<osg::Texture> mTextureScene;
         osg::ref_ptr<osg::Texture> mTextureDepth;

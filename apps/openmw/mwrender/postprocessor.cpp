@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <thread>
+#include <stdexcept>
 
 #include <osg/Texture1D>
 #include <osg/Texture2D>
@@ -126,6 +127,19 @@ namespace MWRender
         , mPingPongCull(new PingPongCull(this))
         , mDistortionCallback(new DistortionCallback)
     {
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_GATE_G_PP_INIT
+        // Establish the actual Android render size before setViewport()
+        // and before createObjectsForFrame() allocates PP textures/FBOs.
+        osg::GraphicsContext* gc = viewer->getCamera()->getGraphicsContext();
+        if (!gc || !gc->getTraits())
+            throw std::runtime_error("OpenMW Android: missing GraphicsContext traits for post-processing");
+        mWidth = gc->getTraits()->width;
+        mHeight = gc->getTraits()->height;
+        Log(Debug::Info) << "OpenMW 0.51 Android renderer: " << mWidth << "x" << mHeight
+                         << ", Tex_Depth scene binding";
+#endif
+
         auto& shaderManager = mRendering.getResourceSystem()->getSceneManager()->getShaderManager();
 
         std::shared_ptr<LuminanceCalculator> luminanceCalculator = std::make_shared<LuminanceCalculator>(shaderManager);
@@ -186,11 +200,12 @@ namespace MWRender
         distortion->setLocked(true);
         mInternalTechniques.push_back(std::move(distortion));
 
+#ifndef ANDROID
         osg::GraphicsContext* gc = viewer->getCamera()->getGraphicsContext();
-        osg::GLExtensions* ext = gc->getState()->get<osg::GLExtensions>();
-
         mWidth = gc->getTraits()->width;
         mHeight = gc->getTraits()->height;
+#endif
+        osg::GLExtensions* ext = gc->getState()->get<osg::GLExtensions>();
 
         if (!ext->glDisablei && ext->glDisableIndexedEXT)
             ext->glDisablei = ext->glDisableIndexedEXT;
@@ -299,7 +314,14 @@ namespace MWRender
         mCanvases[frameId]->setCalculateAvgLum(mHDR);
 
         mCanvases[frameId]->setTextureScene(getTexture(Tex_Scene, frameId));
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_POSTPROCESSING_SCENE_DEPTH
+        // The primary scene depth texture is directly sampleable on GLES2.
+        // Tex_OpaqueDepth depends on an unreliable GL4ES depth copy/blit.
+        mCanvases[frameId]->setTextureDepth(getTexture(Tex_Depth, frameId));
+#else
         mCanvases[frameId]->setTextureDepth(getTexture(Tex_OpaqueDepth, frameId));
+#endif
         mCanvases[frameId]->setTextureDistortion(getTexture(Tex_Distortion, frameId));
 
         mTransparentDepthPostPass->mFbo[frameId] = mFbos[frameId][FBO_Primary];

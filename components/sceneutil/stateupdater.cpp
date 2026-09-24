@@ -132,6 +132,15 @@ namespace SceneUtil
         osg::Fog* fog = new osg::Fog;
         fog->setMode(osg::Fog::LINEAR);
         stateset->setAttributeAndModes(fog, osg::StateAttribute::ON);
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_GL4ES_EXPLICIT_OBJECT_FOG_UNIFORMS
+        // GL4ES does not reliably propagate compatibility gl_Fog built-ins to
+        // every OpenMW 0.51 objects-program variant. Expose the same authoritative
+        // StateUpdater values as ordinary uniforms; only objects.frag consumes them.
+        stateset->addUniform(new osg::Uniform("omwFogColor", osg::Vec4f{}));
+        stateset->addUniform(new osg::Uniform("omwFogStart", 0.f));
+        stateset->addUniform(new osg::Uniform("omwFogEnd", 0.f));
+#endif
         if (mWireframe)
         {
             osg::PolygonMode* polygonmode = new osg::PolygonMode;
@@ -151,6 +160,11 @@ namespace SceneUtil
         fog->setColor(mFogColor);
         fog->setStart(mFogStart);
         fog->setEnd(mFogEnd);
+#ifdef ANDROID
+        stateset->getUniform("omwFogColor")->set(mFogColor);
+        stateset->getUniform("omwFogStart")->set(mFogStart);
+        stateset->getUniform("omwFogEnd")->set(mFogEnd);
+#endif
     }
 
     void StateUpdater::setAmbientColor(const osg::Vec4f& col)

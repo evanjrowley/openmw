@@ -47,44 +47,44 @@ using namespace SceneUtil;
 #if 0
 static const char fragmentShaderSource_withBaseTexture[] =
         "uniform sampler2D baseTexture;                                          \n"
-        "uniform sampler2DShadow shadowTexture;                                  \n"
+        "uniform sampler2D shadowTexture;                                  \n"
         "                                                                        \n"
         "void main(void)                                                         \n"
         "{                                                                       \n"
         "  vec4 colorAmbientEmissive = gl_FrontLightModelProduct.sceneColor;     \n"
         "  vec4 color = texture2D( baseTexture, gl_TexCoord[0].xy );                                            \n"
-        "  color *= mix( colorAmbientEmissive, gl_Color, shadow2DProj( shadowTexture, gl_TexCoord[1] ).r );     \n"
+        "  color *= mix( colorAmbientEmissive, gl_Color, step(gl_TexCoord[1].z / gl_TexCoord[1].w, texture2D(shadowTexture, gl_TexCoord[1].xy / gl_TexCoord[1].w).r) );     \n"
         "  gl_FragColor = color;                                                                                \n"
         "} \n";
 #else
 static const char fragmentShaderSource_withBaseTexture[] =
         "uniform sampler2D baseTexture;                                          \n"
         "uniform int baseTextureUnit;                                            \n"
-        "uniform sampler2DShadow shadowTexture0;                                 \n"
+        "uniform sampler2D shadowTexture0;                                 \n"
         "uniform int shadowTextureUnit0;                                         \n"
         "                                                                        \n"
         "void main(void)                                                         \n"
         "{                                                                       \n"
         "  vec4 colorAmbientEmissive = gl_FrontLightModelProduct.sceneColor;     \n"
         "  vec4 color = texture2D( baseTexture, gl_TexCoord[baseTextureUnit].xy );                                              \n"
-        "  color *= mix( colorAmbientEmissive, gl_Color, shadow2DProj( shadowTexture0, gl_TexCoord[shadowTextureUnit0] ).r );     \n"
+        "  color *= mix( colorAmbientEmissive, gl_Color, step(gl_TexCoord[shadowTextureUnit0].z / gl_TexCoord[shadowTextureUnit0].w, texture2D(shadowTexture0, gl_TexCoord[shadowTextureUnit0].xy / gl_TexCoord[shadowTextureUnit0].w).r) );     \n"
         "  gl_FragColor = color;                                                                                                \n"
         "} \n";
 
 static const char fragmentShaderSource_withBaseTexture_twoShadowMaps[] =
         "uniform sampler2D baseTexture;                                          \n"
         "uniform int baseTextureUnit;                                            \n"
-        "uniform sampler2DShadow shadowTexture0;                                 \n"
+        "uniform sampler2D shadowTexture0;                                 \n"
         "uniform int shadowTextureUnit0;                                         \n"
-        "uniform sampler2DShadow shadowTexture1;                                 \n"
+        "uniform sampler2D shadowTexture1;                                 \n"
         "uniform int shadowTextureUnit1;                                         \n"
         "                                                                        \n"
         "void main(void)                                                         \n"
         "{                                                                       \n"
         "  vec4 colorAmbientEmissive = gl_FrontLightModelProduct.sceneColor;     \n"
         "  vec4 color = texture2D( baseTexture, gl_TexCoord[baseTextureUnit].xy );              \n"
-        "  float shadow0 = shadow2DProj( shadowTexture0, gl_TexCoord[shadowTextureUnit0] ).r;   \n"
-        "  float shadow1 = shadow2DProj( shadowTexture1, gl_TexCoord[shadowTextureUnit1] ).r;   \n"
+        "  float shadow0 = step(gl_TexCoord[shadowTextureUnit0].z / gl_TexCoord[shadowTextureUnit0].w, texture2D(shadowTexture0, gl_TexCoord[shadowTextureUnit0].xy / gl_TexCoord[shadowTextureUnit0].w).r);   \n"
+        "  float shadow1 = step(gl_TexCoord[shadowTextureUnit1].z / gl_TexCoord[shadowTextureUnit1].w, texture2D(shadowTexture1, gl_TexCoord[shadowTextureUnit1].xy / gl_TexCoord[shadowTextureUnit1].w).r);   \n"
         "  color *= mix( colorAmbientEmissive, gl_Color, shadow0*shadow1 );                     \n"
         "  gl_FragColor = color;                                                                \n"
         "} \n";
@@ -553,12 +553,24 @@ MWShadowTechnique::ShadowData::ShadowData(MWShadowTechnique::ViewDependentData* 
     else
     {
         _texture->setInternalFormat(GL_DEPTH_COMPONENT);
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_GLES2_MANUAL_SHADOW_COMPARE
+        // Keep the depth texture in raw-sampling mode; receiver shaders perform
+        // the LEQUAL comparison explicitly. NEAREST avoids interpolating depth.
+        _texture->setShadowComparison(false);
+#else
         _texture->setShadowComparison(true);
         _texture->setShadowTextureMode(osg::Texture2D::LUMINANCE);
+#endif
     }
 
+#ifdef ANDROID
+    _texture->setFilter(osg::Texture2D::MIN_FILTER,osg::Texture2D::NEAREST);
+    _texture->setFilter(osg::Texture2D::MAG_FILTER,osg::Texture2D::NEAREST);
+#else
     _texture->setFilter(osg::Texture2D::MIN_FILTER,osg::Texture2D::LINEAR);
     _texture->setFilter(osg::Texture2D::MAG_FILTER,osg::Texture2D::LINEAR);
+#endif
 
     // the shader clips sampled coordinates, so no need for border
     _texture->setWrap(osg::Texture2D::WRAP_S,osg::Texture2D::CLAMP_TO_EDGE);
@@ -1239,7 +1251,19 @@ void MWShadowTechnique::cull(osgUtil::CullVisitor& cv)
 
         // if we are using multiple shadow maps and CastShadowTraversalMask is being used
         // traverse the scene to compute the extents of the objects
-        if (/*numShadowMapsPerLight>1 &&*/ (_shadowedScene->getCastsShadowTraversalMask() & _worldMask) == 0)
+        bool tightenProjectionToCasterBounds
+            = (_shadowedScene->getCastsShadowTraversalMask() & _worldMask) == 0;
+#ifdef ANDROID
+        if (settings->getShadowMapProjectionHint() == ShadowSettings::ORTHOGRAPHIC_SHADOW_MAP
+            && pl.directionalLight)
+        {
+            // OPENMW_ANDROID_051_ORTHO_NO_CASTER_BOUNDS_TIGHTENING
+            // Diagnostic A/B: do not rescale the orthographic shadow
+            // projection to currently visible caster extents.
+            tightenProjectionToCasterBounds = false;
+        }
+#endif
+        if (tightenProjectionToCasterBounds)
         {
             // osg::ElapsedTime timer;
 
@@ -1499,15 +1523,31 @@ void MWShadowTechnique::cull(osgUtil::CullVisitor& cv)
             }
 
             std::vector<osg::Plane> extraPlanes;
-            if (settings->getMultipleShadowMapHint() == ShadowSettings::CASCADED)
+            bool bypassMainFrustumCrop = false;
+#ifdef ANDROID
+            if (settings->getShadowMapProjectionHint() == ShadowSettings::ORTHOGRAPHIC_SHADOW_MAP
+                && pl.directionalLight)
             {
-                cropShadowCameraToMainFrustum(frustum, camera, cascaseNear, cascadeFar, extraPlanes);
-                for (const auto& plane : extraPlanes)
-                    local_polytope.getPlaneList().push_back(plane);
-                local_polytope.setupMask();
+                // OPENMW_ANDROID_051_ORTHO_NO_MAIN_FRUSTUM_CROP
+                // OPENMW_ANDROID_051_ORTHO_NO_MAIN_FRUSTUM_CROP_ALL_PATHS
+                // Patch 12j correction: setupShadowSettings() uses CASCADED
+                // even with exactly one shadow map, so the previous Patch 12g
+                // else-only bypass never affected our active path.
+                bypassMainFrustumCrop = true;
             }
-            else
-                cropShadowCameraToMainFrustum(frustum, camera, reducedNear, reducedFar, extraPlanes);
+#endif
+            if (!bypassMainFrustumCrop)
+            {
+                if (settings->getMultipleShadowMapHint() == ShadowSettings::CASCADED)
+                {
+                    cropShadowCameraToMainFrustum(frustum, camera, cascaseNear, cascadeFar, extraPlanes);
+                    for (const auto& plane : extraPlanes)
+                        local_polytope.getPlaneList().push_back(plane);
+                    local_polytope.setupMask();
+                }
+                else
+                    cropShadowCameraToMainFrustum(frustum, camera, reducedNear, reducedFar, extraPlanes);
+            }
 
             osg::ref_ptr<VDSMCameraCullCallback> vdsmCallback = new VDSMCameraCullCallback(this, local_polytope);
             camera->setCullCallback(vdsmCallback.get());
@@ -1730,8 +1770,12 @@ void MWShadowTechnique::createShaders()
         _fallbackShadowMapTexture->setWrap(osg::Texture2D::WRAP_T,osg::Texture2D::REPEAT);
         _fallbackShadowMapTexture->setFilter(osg::Texture2D::MIN_FILTER,osg::Texture2D::NEAREST);
         _fallbackShadowMapTexture->setFilter(osg::Texture2D::MAG_FILTER,osg::Texture2D::NEAREST);
+#ifdef ANDROID
+        _fallbackShadowMapTexture->setShadowComparison(false);
+#else
         _fallbackShadowMapTexture->setShadowComparison(true);
         _fallbackShadowMapTexture->setShadowCompareFunc(osg::Texture::ShadowCompareFunc::ALWAYS);
+#endif
 
     }
 
@@ -1746,10 +1790,18 @@ void MWShadowTechnique::createShaders()
     _shadowCastingStateSet->addUniform(new osg::Uniform("alphaTestShadows", false));
     osg::ref_ptr<osg::Depth> depth = new osg::Depth;
     depth->setWriteMask(true);
+#ifndef ANDROID
     osg::ref_ptr<osg::ClipControl> clipcontrol = new osg::ClipControl(osg::ClipControl::LOWER_LEFT, osg::ClipControl::NEGATIVE_ONE_TO_ONE);
     _shadowCastingStateSet->setAttribute(clipcontrol, osg::StateAttribute::ON|osg::StateAttribute::OVERRIDE);
+#endif
     _shadowCastingStateSet->setAttribute(depth, osg::StateAttribute::ON|osg::StateAttribute::OVERRIDE);
+#ifndef ANDROID
     _shadowCastingStateSet->setMode(GL_DEPTH_CLAMP, osg::StateAttribute::ON);
+#else
+    // OPENMW_ANDROID_051_GLES2_NATIVE_SHADOW_CLIPPING
+    // Android/GL4ES intentionally uses normal GLES2 clip-volume clipping;
+    // do not emulate GL_DEPTH_CLAMP by clamping caster vertices in the shader.
+#endif
 
     // TODO: compare performance when alpha testing is handled here versus using a discard in the fragment shader
 }
@@ -1888,22 +1940,45 @@ bool MWShadowTechnique::computeShadowCameraSettings(Frustum& frustum, LightData&
 
     const ShadowSettings* settings = getShadowedScene()->getShadowSettings();
 
-    double dotProduct_v = positionedLight.lightDir * frustum.frustumCenterLine;
-    double gamma_v = acos(dotProduct_v);
-    if (gamma_v<osg::DegreesToRadians(settings->getPerspectiveShadowMapCutOffAngle()) || gamma_v>osg::DegreesToRadians(180.0-settings->getPerspectiveShadowMapCutOffAngle()))
+#ifdef ANDROID
+    if (settings->getShadowMapProjectionHint() == ShadowSettings::ORTHOGRAPHIC_SHADOW_MAP
+        && positionedLight.directionalLight)
     {
-        OSG_INFO<<"View direction and Light direction below tolerance"<<std::endl;
-        osg::Vec3d viewSide = osg::Matrixd::transform3x3(frustum.modelViewMatrix, osg::Vec3d(1.0,0.0,0.0));
-        lightSide = positionedLight.lightDir ^ (viewSide ^ positionedLight.lightDir);
-        lightSide.normalize();
+        // OPENMW_ANDROID_051_STABLE_ORTHO_SHADOW_BASIS
+        // Keep the sun direction unchanged, but orient the orthographic shadow
+        // camera from a stable world axis instead of the main camera view.
+        // This avoids the lightDir x viewDir singularity/fallback flip when the
+        // player looks close to the sunlight direction.
+        const osg::Vec3d stableAxis = fabs(positionedLight.lightDir.z()) < 0.95
+            ? osg::Vec3d(0.0, 0.0, 1.0)
+            : osg::Vec3d(0.0, 1.0, 0.0);
+        lightSide = positionedLight.lightDir ^ stableAxis;
+        if (lightSide.length2() < 1e-12)
+            lightSide.set(1.0, 0.0, 0.0);
+        else
+            lightSide.normalize();
     }
     else
+#endif
     {
-        lightSide = positionedLight.lightDir ^ frustum.frustumCenterLine;
-        lightSide.normalize();
+        double dotProduct_v = positionedLight.lightDir * frustum.frustumCenterLine;
+        double gamma_v = acos(dotProduct_v);
+        if (gamma_v<osg::DegreesToRadians(settings->getPerspectiveShadowMapCutOffAngle()) || gamma_v>osg::DegreesToRadians(180.0-settings->getPerspectiveShadowMapCutOffAngle()))
+        {
+            OSG_INFO<<"View direction and Light direction below tolerance"<<std::endl;
+            osg::Vec3d viewSide = osg::Matrixd::transform3x3(frustum.modelViewMatrix, osg::Vec3d(1.0,0.0,0.0));
+            lightSide = positionedLight.lightDir ^ (viewSide ^ positionedLight.lightDir);
+            lightSide.normalize();
+        }
+        else
+        {
+            lightSide = positionedLight.lightDir ^ frustum.frustumCenterLine;
+            lightSide.normalize();
+        }
     }
 
     osg::Vec3d lightUp = lightSide ^ positionedLight.lightDir;
+    lightUp.normalize();
 
 #if 0
     OSG_NOTICE<<"positionedLight.lightDir="<<positionedLight.lightDir<<std::endl;
@@ -1914,6 +1989,29 @@ bool MWShadowTechnique::computeShadowCameraSettings(Frustum& frustum, LightData&
 
     if (positionedLight.directionalLight)
     {
+#ifdef ANDROID
+        if (settings->getShadowMapProjectionHint() == ShadowSettings::ORTHOGRAPHIC_SHADOW_MAP)
+        {
+            // OPENMW_ANDROID_051_ORTHO_FIXED_EYE_VOLUME
+            // Diagnostic A/B: the Android shadow-camera volume follows only
+            // the camera position and sunlight direction, never the current
+            // look direction/FOV/frustum corners. This intentionally trades
+            // texel efficiency for a rotation-invariant shadow projection.
+            const double halfExtent = osg::maximum<double>(512.0, settings->getMaximumShadowMapDistance());
+            const double depthExtent = halfExtent * 2.0;
+            const osg::Vec3d anchor = frustum.eye;
+
+            projectionMatrix.makeOrtho(
+                -halfExtent, halfExtent,
+                -halfExtent, halfExtent,
+                0.0, depthExtent * 2.0);
+            viewMatrix.makeLookAt(
+                anchor - positionedLight.lightDir * depthExtent,
+                anchor + positionedLight.lightDir * depthExtent,
+                lightUp);
+            return true;
+        }
+#endif
         double xMin=0.0, xMax=0.0;
         double yMin=0.0, yMax=0.0;
         double zMin=0.0, zMax=0.0;

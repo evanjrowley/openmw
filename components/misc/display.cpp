@@ -63,13 +63,62 @@ namespace Misc
         }
         else
         {
-            // everything between 21:9 and 22:9
-            // is usually referred as 21:9
             float ratio = static_cast<float>(xaspect) / yaspect;
-            if (ratio >= 21 / 9.f && ratio < 22 / 9.f)
+
+#ifdef ANDROID
+            // OPENMW_ANDROID_051_COMMON_ASPECT_RATIO
+            // Logical Android render sizes may use integer approximations of
+            // standard video modes, e.g. 854x480 is 427:240 mathematically but
+            // conventionally represents 16:9. Snap only very close matches so
+            // genuinely unusual aspect ratios keep their exact reduced value.
+            struct CommonAspect
             {
-                xaspect = 21;
-                yaspect = 9;
+                int x;
+                int y;
+            };
+            static constexpr CommonAspect commonAspects[] = {
+                { 5, 4 },
+                { 4, 3 },
+                { 3, 2 },
+                { 16, 10 },
+                { 16, 9 },
+                { 18, 9 },
+                { 19, 9 },
+                { 20, 9 },
+                { 21, 9 },
+                { 32, 9 },
+            };
+
+            const CommonAspect* bestAspect = nullptr;
+            float bestRelativeError = 0.01f;
+            for (const CommonAspect& candidate : commonAspects)
+            {
+                const float candidateRatio = static_cast<float>(candidate.x) / candidate.y;
+                const float relativeError = ratio > candidateRatio
+                    ? (ratio - candidateRatio) / candidateRatio
+                    : (candidateRatio - ratio) / candidateRatio;
+                if (relativeError < bestRelativeError)
+                {
+                    bestRelativeError = relativeError;
+                    bestAspect = &candidate;
+                }
+            }
+
+            if (bestAspect)
+            {
+                xaspect = bestAspect->x;
+                yaspect = bestAspect->y;
+            }
+            else
+#endif
+            {
+                // everything between 21:9 and 22:9
+                // is usually referred as 21:9
+                if (ratio >= 21 / 9.f && ratio < 22 / 9.f)
+                {
+                    xaspect = 21;
+                    yaspect = 9;
+                }
             }
         }
 

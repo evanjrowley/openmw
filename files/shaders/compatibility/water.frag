@@ -213,7 +213,14 @@ void main(void)
 #endif
 
     gl_FragData[0].rgb = mix(refraction, reflection, fresnel);
+#if @wetWorldWaterMask
+    // OPENMW_ANDROID_051_WETWORLD_WATER_MASK
+    // Alpha is reserved as an exact post-processing water marker on Android.
+    // RGB shading and native rain-ripple lighting remain unchanged.
+    gl_FragData[0].a = 0.0;
+#else
     gl_FragData[0].a = 1.0;
+#endif
     // no alpha here, so make sure raindrop ripple specularity gets properly subdued
     rainSpecular *= waterTransparency;
 #else

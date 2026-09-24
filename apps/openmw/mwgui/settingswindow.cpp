@@ -351,15 +351,25 @@ namespace MWGui
             += MyGUI::newDelegate(this, &SettingsWindow::onResetDefaultBindings);
 
         // fill resolution list
+        std::vector<std::pair<int, int>> resolutions;
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_ACTIVE_RENDER_RESOLUTION_ONLY
+        // Android's physical panel mode is not OpenMW's logical render size.
+        // Expose only the actual launcher-selected render resolution.
+        const int configuredWidth = Settings::video().mResolutionX;
+        const int configuredHeight = Settings::video().mResolutionY;
+        if (configuredWidth > 0 && configuredHeight > 0)
+            resolutions.emplace_back(configuredWidth, configuredHeight);
+#else
         const int screen = Settings::video().mScreen;
         int numDisplayModes = SDL_GetNumDisplayModes(screen);
-        std::vector<std::pair<int, int>> resolutions;
         for (int i = 0; i < numDisplayModes; i++)
         {
             SDL_DisplayMode mode;
             SDL_GetDisplayMode(screen, i, &mode);
             resolutions.emplace_back(mode.w, mode.h);
         }
+#endif
         std::sort(resolutions.begin(), resolutions.end(), sortResolutions);
         for (std::pair<int, int>& resolution : resolutions)
         {

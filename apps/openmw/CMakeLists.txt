@@ -145,6 +145,11 @@ if(BUILD_OPENMW)
             main.cpp
             androidmain.cpp
         )
+        # androidmain.cpp pulls in osg headers; the SHARED target does not
+        # inherit them through openmw-lib's private link dependencies, and the
+        # root include_directories() ran before FetchContent had set them.
+        target_include_directories(openmw PRIVATE
+            $<TARGET_PROPERTY:osg,INTERFACE_INCLUDE_DIRECTORIES>)
     else()
         openmw_add_executable(openmw
             ${APPLE_BUNDLE_RESOURCES}

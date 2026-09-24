@@ -290,6 +290,10 @@ namespace MWRender
         void updateTextureFiltering();
         void updateAmbient();
         void setFogColor(const osg::Vec4f& color);
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_CPU_SUN_OCCLUSION
+        void updateAndroidSunOcclusion(float dt);
+#endif
 
         struct WorldspaceChunkMgr
         {
@@ -361,6 +365,13 @@ namespace MWRender
         float mFirstPersonFieldOfView;
         bool mUpdateProjectionMatrix = false;
         bool mNight = false;
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_CPU_SUN_OCCLUSION
+        osg::Vec3f mAndroidSunDiscDirection{ 0.f, 0.f, 1.f };
+        float mAndroidSunOcclusion = 1.f;
+        float mAndroidSunOcclusionTarget = 1.f;
+        float mAndroidSunOcclusionRayTimer = 0.f;
+#endif
         osg::Vec2f mProjectionOffset;
         const MWWorld::GroundcoverStore& mGroundCoverStore;
 

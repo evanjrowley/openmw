@@ -6,12 +6,18 @@ varying float alphaPassthrough;
 
 uniform int colorMode;
 uniform bool useTreeAnim;
-uniform bool useDiffuseMapForShadowAlpha = true;
-uniform bool alphaTestShadows = true;
+uniform bool useDiffuseMapForShadowAlpha;
+uniform bool alphaTestShadows;
 
 void main(void)
 {
     gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+
+    // OPENMW_ANDROID_051_GLES2_NATIVE_SHADOW_CLIPPING
+    // GL_DEPTH_CLAMP/ARB_clip_control are unavailable through the GLES2 backend.
+    // Deliberately use normal GLES2 near/far clipping here. Per-vertex Z
+    // clamping can collapse off-volume caster vertices onto a clip plane and
+    // produce large view-dependent triangular shadow projections.
 
     vec4 viewPos = (gl_ModelViewMatrix * gl_Vertex);
     gl_ClipVertex = viewPos;

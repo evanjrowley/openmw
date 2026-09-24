@@ -553,18 +553,77 @@ namespace Shader
                 return nullptr;
             }
 
-            osg::ref_ptr<osg::Shader> shader(new osg::Shader(type ? *type : getShaderType(templateName)));
+            std::optional<osg::Shader::Type> resolvedType = type;
+            if (!resolvedType.has_value())
+                resolvedType = getShaderType(templateName);
+
+#ifdef ANDROID
+            // (openmw) GLES2 drivers (e.g. Adreno via gl4es) reject shader
+            // objects without main() at compile time and fail to link
+            // separate objects that call each other's functions. Inline the
+            // linked shader sources into the parent instead of attaching
+            // standalone objects.
+            if (!linkedShaderNames.empty())
+            {
+                lock.unlock();
+                for (const auto& linkedShaderName : linkedShaderNames)
+                {
+                    auto linkedShader = getShader(linkedShaderName, defines, resolvedType);
+                    if (linkedShader)
+                        shaderSource += "\n" + linkedShader->getShaderSource();
+                }
+                linkedShaderNames.clear();
+                lock.lock();
+
+                // (openmw) repeated includes of the same header leave several
+                // identical uniform declarations; gl4es hoists every sampler
+                // declaration to the top of the converted shader, so
+                // duplicates are rejected by GLES2 drivers as redefinitions.
+                // Keep the first declaration of each uniform, drop the rest.
+                std::set<std::string> seenUniforms;
+                std::istringstream in(shaderSource);
+                std::ostringstream outLines;
+                std::string line;
+                while (std::getline(in, line))
+                {
+                    if (line.rfind("uniform ", 0) == 0 && !seenUniforms.insert(line).second)
+                        continue;
+                    outLines << line << "\n";
+                }
+                shaderSource = outLines.str();
+            }
+#endif
+
+            osg::ref_ptr<osg::Shader> shader(new osg::Shader(*resolvedType));
             shader->setShaderSource(shaderSource);
             // Assign a unique prefix to allow the SharedStateManager to compare shaders efficiently.
             // Append shader source filename for debugging.
             static unsigned int counter = 0;
             shader->setName(std::format("{} {}", counter++, templateName));
 
+#ifdef ANDROID
+            // (openmw) temporary debug: dump merged sources to inspect
+            // GLES2 compile failures
+            if (getenv("OPENMW_DUMP_SHADERS") != nullptr)
+            {
+                std::filesystem::path dumpDir = "/sdcard/omw_nightly/shaderdump";
+                std::filesystem::create_directories(dumpDir);
+                std::string safeName = templateName;
+                for (auto& c : safeName)
+                    if (c == '/')
+                        c = '_';
+                std::ofstream dump(dumpDir / (std::to_string(counter - 1) + "_" + safeName));
+                dump << shaderSource;
+            }
+#endif
+
             mHotReloadManager->addShaderFiles(templateName, defines);
 
+#ifndef ANDROID
             lock.unlock();
             getLinkedShaders(shader, linkedShaderNames, defines);
             lock.lock();
+#endif
 
             shaderIt = mShaders.insert(std::make_pair(std::make_pair(templateName, defines), shader)).first;
         }

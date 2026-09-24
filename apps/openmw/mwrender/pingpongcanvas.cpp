@@ -1,6 +1,9 @@
 #include "pingpongcanvas.hpp"
 
 #include <cassert>
+#include <cstdlib>
+
+#include <osg/Shader>
 
 #include <components/shader/shadermanager.hpp>
 #include <components/stereo/multiview.hpp>
@@ -40,6 +43,55 @@ namespace MWRender
         mFallbackStateSet->setAttributeAndModes(mFallbackProgram);
         mFallbackStateSet->addUniform(new osg::Uniform("lastShader", 0));
         mFallbackStateSet->addUniform(new osg::Uniform("scaling", osg::Vec2f(1, 1)));
+
+#ifdef ANDROID
+        // OPENMW_ANDROID_051_FINAL_GAMMA
+        // OPENMW_GAMMA is supplied by the Android launcher. SDL gamma ramps are
+        // ineffective on Android, so gamma is applied once to the final image.
+        float androidGamma = 1.f;
+        if (const char* value = std::getenv("OPENMW_GAMMA"))
+        {
+            char* end = nullptr;
+            const float parsed = std::strtof(value, &end);
+            if (end != value && parsed >= 0.1f && parsed <= 5.f)
+                androidGamma = parsed;
+        }
+
+        if (androidGamma != 1.f)
+        {
+            static const char* vertexSource = R"GLSL(#version 120
+uniform vec2 scaling;
+varying vec2 uv;
+void main()
+{
+    gl_Position = vec4(gl_Vertex.xy, 0.0, 1.0);
+    uv = (gl_Position.xy * 0.5 + 0.5) * scaling;
+}
+)GLSL";
+
+            static const char* fragmentSource = R"GLSL(#version 120
+uniform sampler2D lastShader;
+uniform float androidGamma;
+varying vec2 uv;
+void main()
+{
+    vec4 color = texture2D(lastShader, uv);
+    color.rgb = pow(max(color.rgb, vec3(0.0)), vec3(1.0 / androidGamma));
+    gl_FragColor = color;
+}
+)GLSL";
+
+            osg::ref_ptr<osg::Program> gammaProgram = new osg::Program;
+            gammaProgram->addShader(new osg::Shader(osg::Shader::VERTEX, vertexSource));
+            gammaProgram->addShader(new osg::Shader(osg::Shader::FRAGMENT, fragmentSource));
+
+            mAndroidGammaStateSet = new osg::StateSet;
+            mAndroidGammaStateSet->setAttributeAndModes(gammaProgram);
+            mAndroidGammaStateSet->addUniform(new osg::Uniform("lastShader", 0));
+            mAndroidGammaStateSet->addUniform(new osg::Uniform("scaling", osg::Vec2f(1.f, 1.f)));
+            mAndroidGammaStateSet->addUniform(new osg::Uniform("androidGamma", androidGamma));
+        }
+#endif
 
         mMultiviewResolveProgram = shaderManager.getProgram("multiview_resolve");
         mMultiviewResolveStateSet->setAttributeAndModes(mMultiviewResolveProgram);
@@ -95,6 +147,18 @@ namespace MWRender
 
         if (filtered.empty() || !mPostprocessing)
         {
+#ifdef ANDROID
+            if (mAndroidGammaStateSet && !Stereo::getMultiview())
+            {
+                state.pushStateSet(mAndroidGammaStateSet);
+                state.apply();
+                state.applyTextureAttribute(0, mTextureScene);
+                resolveViewport->apply(state);
+                drawGeometry(renderInfo);
+                state.popStateSet();
+                return;
+            }
+#endif
             state.pushStateSet(mFallbackStateSet);
             state.apply();
 
@@ -171,6 +235,9 @@ namespace MWRender
 
         int lastDraw = 0;
         int lastShader = 0;
+#ifdef ANDROID
+        bool androidGammaPending = false;
+#endif
 
         unsigned int lastApplied = handle;
 
@@ -276,6 +343,19 @@ namespace MWRender
                             ->getAttachment(osg::Camera::COLOR_BUFFER0)
                             .getTexture());
 
+#ifdef ANDROID
+                if (mAndroidGammaStateSet && !Stereo::getMultiview() && lastPass && index == filtered.back()
+                    && !pass.mRenderTarget)
+                {
+                    lastDraw = buffer[0];
+                    lastShader = buffer[0];
+                    mFbos[buffer[0] - GL_COLOR_ATTACHMENT0_EXT]->apply(
+                        state, osg::FrameBufferObject::DRAW_FRAMEBUFFER);
+                    lastApplied = mFbos[buffer[0] - GL_COLOR_ATTACHMENT0_EXT]->getHandle(cid);
+                    androidGammaPending = true;
+                }
+                else
+#endif
                 if (pass.mRenderTarget)
                 {
                     pass.mRenderTarget->apply(state, osg::FrameBufferObject::DRAW_FRAMEBUFFER);
@@ -331,6 +411,27 @@ namespace MWRender
 
             state.popStateSet();
         }
+
+#ifdef ANDROID
+        if (androidGammaPending)
+        {
+            bindDestinationFbo();
+            if (!destinationFbo)
+                resolveViewport->apply(state);
+
+            state.pushStateSet(mAndroidGammaStateSet);
+            state.apply();
+            state.applyTextureAttribute(PostProcessor::Unit_LastShader,
+                (osg::Texture*)mFbos[lastShader - GL_COLOR_ATTACHMENT0_EXT]
+                    ->getAttachment(osg::Camera::COLOR_BUFFER0)
+                    .getTexture());
+            drawGeometry(renderInfo);
+            state.popStateSet();
+            state.apply();
+
+            lastApplied = destinationHandle;
+        }
+#endif
 
         if (Stereo::getMultiview())
         {
