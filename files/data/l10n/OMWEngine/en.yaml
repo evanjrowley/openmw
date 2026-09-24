@@ -122,6 +122,11 @@ ForcePerPixelLightingTooltip: |-
 
     Note that groundcover shaders and particle effects ignore this setting.
 FrameRateHint: "Hint: press F3 to show\nthe current frame rate."
+FrameRateToggleShow: "Show frame rate"
+FrameRateLevel1: "Frame rate: FPS only"
+FrameRateLevel2: "Frame rate: + viewer stats"
+FrameRateLevel3: "Frame rate: + camera scene stats"
+FrameRateLevel4: "Frame rate: + viewer scene stats"
 GammaCorrection: "Gamma Correction"
 GammaCorrectionValue: "Gamma Correction ({value, number, ::.00})"
 GammaDark: "Dark"

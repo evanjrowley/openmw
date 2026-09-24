@@ -8,6 +8,8 @@
 
 #include <osgViewer/Viewer>
 
+#include <osgGA/EventQueue>
+
 #include <MyGUI_ClipboardManager.h>
 #include <MyGUI_FactoryManager.h>
 #include <MyGUI_InputManager.h>
@@ -2086,6 +2088,19 @@ namespace MWGui
             && !isConsoleMode()
             // TODO: remove this, once we have properly serialized the state of open windows
             && (!isGuiMode() || (mGuiModes.size() == 1 && (getMode() == GM_MainMenu || getMode() == GM_Rest)));
+    }
+
+    int WindowManager::cycleFpsLevel()
+    {
+        // Synthesize the F3 key press that the stats handler listens for and
+        // track which of its five levels (off, frame rate, viewer stats,
+        // camera scene stats, viewer scene stats) the overlay is on. A
+        // physical F3 press would desync the counter, but Android has no
+        // keyboard.
+        mFpsLevel = (mFpsLevel + 1) % 5;
+        mViewer->getEventQueue()->keyPress(osgGA::GUIEventAdapter::KEY_F3);
+        mViewer->getEventQueue()->keyRelease(osgGA::GUIEventAdapter::KEY_F3);
+        return mFpsLevel;
     }
 
     void WindowManager::playVideo(std::string_view name, bool allowSkipping, bool overrideSounds)

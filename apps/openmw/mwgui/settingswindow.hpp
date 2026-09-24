@@ -58,6 +58,7 @@ namespace MWGui
         MyGUI::Button* mGmstOverridesL10n;
 
         MyGUI::Widget* mWindowModeHint;
+        MyGUI::Button* mFpsToggleButton;
 
         // controls
         MyGUI::ScrollView* mControlsBox;
@@ -85,6 +86,7 @@ namespace MWGui
         void highlightCurrentResolution();
 
         void onRefractionButtonClicked(MyGUI::Widget* sender);
+        void onFpsToggleButtonClicked(MyGUI::Widget* sender);
         void onWaterTextureSizeChanged(MyGUI::ComboBox* sender, size_t pos);
         void onWaterReflectionDetailChanged(MyGUI::ComboBox* sender, size_t pos);
         void onWaterRainRippleDetailChanged(MyGUI::ComboBox* sender, size_t pos);

@@ -118,6 +118,12 @@ namespace MWBase
         /// (and will continually update the window while doing so)
         virtual void playVideo(std::string_view name, bool allowSkipping, bool overrideSounds = true) = 0;
 
+        /// Advance the on-screen stats overlay (the F3 key binding) to its
+        /// next level for platforms without a keyboard, returning the new
+        /// level: 0 hidden, 1 frame rate only, 2 viewer stats,
+        /// 3 camera scene stats, 4 viewer scene stats.
+        virtual int cycleFpsLevel() = 0;
+
         virtual void setNewGame(bool newgame) = 0;
 
         virtual void pushGuiMode(MWGui::GuiMode mode, const MWWorld::Ptr& arg) = 0;

@@ -281,6 +281,7 @@ namespace MWGui
         getWidget(mSecondaryLanguage, "SecondaryLanguage");
         getWidget(mGmstOverridesL10n, "GmstOverridesL10nButton");
         getWidget(mWindowModeHint, "WindowModeHint");
+        getWidget(mFpsToggleButton, "FpsToggleButton");
         getWidget(mLightingMethodButton, "LightingMethodButton");
         getWidget(mLightsResetButton, "LightsResetButton");
         getWidget(mMaxLights, "MaxLights");
@@ -331,6 +332,17 @@ namespace MWGui
 
         mWindowModeList->eventComboChangePosition += MyGUI::newDelegate(this, &SettingsWindow::onWindowModeChanged);
         mVSyncModeList->eventComboChangePosition += MyGUI::newDelegate(this, &SettingsWindow::onVSyncModeChanged);
+
+#ifdef ANDROID
+        // No F-Keys on touch screens: replace the F3 hint with a button that
+        // toggles the frame rate overlay directly.
+        MyGUI::Widget* frameRateHint;
+        getWidget(frameRateHint, "FrameRateHint");
+        frameRateHint->setVisible(false);
+        mFpsToggleButton->setVisible(true);
+        mFpsToggleButton->eventMouseButtonClick
+            += MyGUI::newDelegate(this, &SettingsWindow::onFpsToggleButtonClicked);
+#endif
 
         mKeyboardSwitch->eventMouseButtonClick += MyGUI::newDelegate(this, &SettingsWindow::onKeyboardSwitchClicked);
         mControllerSwitch->eventMouseButtonClick
@@ -701,6 +713,16 @@ namespace MWGui
             apply();
             return;
         }
+    }
+
+    void SettingsWindow::onFpsToggleButtonClicked(MyGUI::Widget* /*sender*/)
+    {
+        // The F3 handler cycles five overlay levels before wrapping to off;
+        // label the button with the level this click switched to.
+        const int level = MWBase::Environment::get().getWindowManager()->cycleFpsLevel();
+        static const char* const keys[] = { "FrameRateToggleShow", "FrameRateLevel1", "FrameRateLevel2",
+            "FrameRateLevel3", "FrameRateLevel4" };
+        mFpsToggleButton->setCaptionWithReplacing(std::string("#{OMWEngine:") + keys[level] + "}");
     }
 
     void SettingsWindow::onTextureFilteringChanged(MyGUI::ComboBox* /*sender*/, size_t pos)

@@ -145,6 +145,8 @@ namespace MWGui
         /// (and will continually update the window while doing so)
         void playVideo(std::string_view name, bool allowSkipping, bool overrideSounds = true) override;
 
+        int cycleFpsLevel() override;
+
         /// Warning: do not use MyGUI::InputManager::setKeyFocusWidget directly. Instead use this.
         void setKeyFocusWidget(MyGUI::Widget* widget) override;
 
@@ -419,6 +421,7 @@ namespace MWGui
 
         std::unique_ptr<MyGUIPlatform::Platform> mGuiPlatform;
         osgViewer::Viewer* mViewer;
+        int mFpsLevel = 0;
 
         std::unique_ptr<Gui::FontLoader> mFontLoader;
         std::unique_ptr<StatsWatcher> mStatsWatcher;

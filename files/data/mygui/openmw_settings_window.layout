@@ -320,8 +320,11 @@
                             </Widget>
                         </Widget>
 
-                        <Widget type="AutoSizedTextBox" skin="SandText" position="207 174 300 32" align="Left Top">
+                        <Widget type="AutoSizedTextBox" skin="SandText" position="207 174 300 32" align="Left Top" name="FrameRateHint">
                             <Property key="Caption" value="#{OMWEngine:FrameRateHint}"/>
+                        </Widget>
+                        <Widget type="AutoSizedButton" skin="MW_Button" position="207 174 300 24" align="Left Top" name="FpsToggleButton" visible="false">
+                            <Property key="Caption" value="#{OMWEngine:FrameRateToggleShow}"/>
                         </Widget>
                         <Widget type="AutoSizedTextBox" skin="SandText" position="207 216 300 32" align="Left Top" name="WindowModeHint">
                             <Property key="Caption" value="#{OMWEngine:WindowModeHint}"/>
