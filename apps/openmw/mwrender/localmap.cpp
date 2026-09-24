@@ -701,16 +701,7 @@ namespace MWRender
         mViewMatrix.makeLookAt(osg::Vec3d(x, y, zmax + 5), osg::Vec3d(x, y, zmin), upVector);
 
         setUpdateCallback(new CameraLocalUpdateCallback);
-#ifdef ANDROID
-        // OPENMW_ANDROID_051_LOCAL_MAP_RTT
-        // GL4ES/GLES2: the packed depth+stencil attachment makes the render
-        // target incomplete, so the map texture is never rendered and the
-        // explored area of the local map draws as white. Use a plain depth
-        // attachment instead.
-        setDepthBufferInternalFormat(GL_DEPTH_COMPONENT);
-#else
         setDepthBufferInternalFormat(GL_DEPTH24_STENCIL8);
-#endif
     }
 
     void LocalMapRenderToTexture::setDefaults(osg::Camera* camera)
@@ -725,13 +716,7 @@ namespace MWRender
         camera->setReferenceFrame(osg::Camera::ABSOLUTE_RF_INHERIT_VIEWPOINT);
         camera->setRenderTargetImplementation(osg::Camera::FRAME_BUFFER_OBJECT, osg::Camera::PIXEL_BUFFER_RTT);
         camera->setClearColor(osg::Vec4(0.f, 0.f, 0.f, 1.f));
-#ifdef ANDROID
-        // OPENMW_ANDROID_051_LOCAL_MAP_RTT: no stencil attachment on the
-        // GL4ES-compatible target, so don't clear the stencil bit either.
-        camera->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#else
         camera->setClearMask(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-#endif
         camera->setRenderOrder(osg::Camera::PRE_RENDER);
 
         camera->setCullMask(Mask_Scene | Mask_SimpleWater | Mask_Terrain | Mask_Object | Mask_Static);
