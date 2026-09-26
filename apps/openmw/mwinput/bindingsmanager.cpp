@@ -657,9 +657,11 @@ namespace MWInput
         mInputBinder->buttonReleased(deviceID, arg);
     }
 
-    void BindingsManager::controllerAxisMoved(int deviceID, const SDL_ControllerAxisEvent& arg)
+    void BindingsManager::controllerAxisMoved(int deviceID, const SDL_ControllerAxisEvent& arg, bool trackOnly)
     {
+        mTrackOnlyAxisEvents = trackOnly;
         mInputBinder->axisMoved(deviceID, arg);
+        mTrackOnlyAxisEvents = false;
     }
 
     SDL_Scancode BindingsManager::getKeyBinding(int actionId)
@@ -696,7 +698,7 @@ namespace MWInput
                 action = A_CycleSpellLeft;
         }
 
-        if (previousValue <= 0.6 && currentValue > 0.6)
+        if (!mTrackOnlyAxisEvents && previousValue <= 0.6 && currentValue > 0.6)
             manager->executeAction(action);
     }
 

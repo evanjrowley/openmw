@@ -59,7 +59,7 @@ namespace MWInput
         void controllerRemoved(const SDL_ControllerDeviceEvent& arg);
         void controllerButtonPressed(int deviceID, const SDL_ControllerButtonEvent& arg);
         void controllerButtonReleased(int deviceID, const SDL_ControllerButtonEvent& arg);
-        void controllerAxisMoved(int deviceID, const SDL_ControllerAxisEvent& arg);
+        void controllerAxisMoved(int deviceID, const SDL_ControllerAxisEvent& arg, bool trackOnly = false);
 
         SDL_Scancode getKeyBinding(int actionId);
 
@@ -76,6 +76,7 @@ namespace MWInput
         std::filesystem::path mUserFile;
 
         bool mDragDrop;
+        bool mTrackOnlyAxisEvents = false;
     };
 }
 #endif

@@ -227,15 +227,28 @@ namespace MWInput
             return;
 
         mJoystickLastUsed = true;
+        const bool isTriggerAxis = arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT
+            || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT;
         if (MWBase::Environment::get().getWindowManager()->isGuiMode())
         {
-            if (gamepadToGuiControl(arg))
+            bool consumed = gamepadToGuiControl(arg);
+            if (consumed && isTriggerAxis)
+            {
+                /* The GUI layer uses trigger axis events for window cycling and
+                 * zoom, and swallows them. Feed the bindings anyway in track-only
+                 * mode so trigger-bound controls (e.g. Activate) keep their true
+                 * rest value - otherwise a release eaten by a menu leaves the
+                 * control at full pull and the next pull misses its rising edge. */
+                mBindingsManager->controllerAxisMoved(deviceID, arg, true);
+            }
+            if (consumed)
                 return;
         }
-        else if (mBindingsManager->actionIsActive(A_TogglePOV)
-            && (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT))
+        else if (mBindingsManager->actionIsActive(A_TogglePOV) && isTriggerAxis)
         {
-            // Preview Mode Gamepad Zooming; do not propagate to mBindingsManager
+            // Preview Mode Gamepad Zooming; do not propagate as action input
+            // (but keep the bindings tracking the physical axis, as above).
+            mBindingsManager->controllerAxisMoved(deviceID, arg, true);
             return;
         }
         mBindingsManager->controllerAxisMoved(deviceID, arg);
