@@ -24,6 +24,14 @@ namespace MWInput
 
         void update(float dt);
 
+        // OPENMW_ANDROID_051_DEBUG_TELEMETRY
+        // Answer a pending ADB debug-state request (see DebugInputReceiver.kt
+        // ACTION_STATE): logs player position/rotation, cell, GUI mode, the
+        // crosshair focus object, and the nearest actor matching the request
+        // hint (with bearing/distance) to openmw.log. Must be called once per
+        // frame from the engine thread; the request itself is thread-safe.
+        void androidDebugPoll();
+
         void buttonPressed(int deviceID, const SDL_ControllerButtonEvent& arg) override;
         void buttonReleased(int deviceID, const SDL_ControllerButtonEvent& arg) override;
         void axisMoved(int deviceID, const SDL_ControllerAxisEvent& arg) override;

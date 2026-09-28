@@ -62,6 +62,10 @@ namespace MWInput
         mInputWrapper->setMouseVisible(MWBase::Environment::get().getWindowManager()->getCursorVisible());
         mInputWrapper->capture(disableEvents);
 
+        // OPENMW_ANDROID_051_DEBUG_TELEMETRY: answer ADB debug-state
+        // requests even while controls are disabled (chargen etc.).
+        mControllerManager->androidDebugPoll();
+
         if (disableControls)
         {
             mMouseManager->updateCursorMode();

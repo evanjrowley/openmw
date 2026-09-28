@@ -24,6 +24,29 @@
 #include "bindingsmanager.hpp"
 #include "mousemanager.hpp"
 
+// OPENMW_ANDROID_051_DEBUG_TELEMETRY: kept as a separate include group
+// after the original block so the earlier patches' hunks (which touch
+// that block) keep applying and reversing against this tree.
+#include <atomic>
+#include <cmath>
+#include <iomanip>
+#include <mutex>
+#include <sstream>
+#include <vector>
+
+#if defined(__ANDROID__)
+#include <jni.h>
+#endif
+
+#include <components/misc/strings/algorithm.hpp>
+#include <osg/Vec3f>
+
+#include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/world.hpp"
+#include "../mwworld/cellstore.hpp"
+#include "../mwworld/class.hpp"
+#include "../mwworld/refdata.hpp"
+
 namespace MWInput
 {
     ControllerManager::ControllerManager(BindingsManager* bindingsManager, MouseManager* mouseManager,
@@ -641,5 +664,126 @@ namespace MWInput
     void ControllerManager::touchpadReleased(int deviceId, const SDLUtil::TouchEvent& arg)
     {
         MWBase::Environment::get().getLuaManager()->inputEvent({ MWBase::LuaManager::InputEvent::TouchReleased, arg });
+    }
+
+    // OPENMW_ANDROID_051_DEBUG_TELEMETRY: kept at end-of-file (rather than
+    // beside the constructor) so the earlier patches' hunks keep applying
+    // and reversing against this tree.
+    namespace
+    {
+        // ADB debug-state requests arrive on a binder thread (JNI) and are
+        // answered once per frame on the engine thread, so every engine
+        // access stays on the thread that owns it.
+        std::mutex sDebugHintMutex;
+        std::string sDebugHint;
+        std::atomic<bool> sDebugPending{ false };
+
+        // Generous search radius (game units) for the "nearest actor
+        // matching hint" report; the exact activation range is much smaller.
+        constexpr float sDebugNearestRadius = 4000.f;
+
+        float normalizeAngleDeg(float a)
+        {
+            while (a > 180.f)
+                a -= 360.f;
+            while (a < -180.f)
+                a += 360.f;
+            return a;
+        }
+    }
+
+#if defined(__ANDROID__)
+    extern "C" JNIEXPORT void JNICALL
+        Java_debug_DebugInputReceiver_nativeDebugRequest(JNIEnv* env, jclass, jstring hint)
+    {
+        const char* chars = hint ? env->GetStringUTFChars(hint, nullptr) : nullptr;
+        {
+            std::lock_guard<std::mutex> lock(sDebugHintMutex);
+            sDebugHint = chars ? chars : "";
+        }
+        if (chars)
+            env->ReleaseStringUTFChars(hint, chars);
+        sDebugPending.store(true, std::memory_order_release);
+    }
+#endif
+
+    void ControllerManager::androidDebugPoll()
+    {
+        if (!sDebugPending.exchange(false))
+            return;
+
+        MWBase::World* world = MWBase::Environment::get().getWorld();
+        const MWWorld::Ptr player = world->getPlayerPtr();
+        const ESM::Position& pos = player.getRefData().getPosition();
+        const MWBase::WindowManager* winMgr = MWBase::Environment::get().getWindowManager();
+
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(1)
+            << "pos=" << pos.pos[0] << ',' << pos.pos[1] << ',' << pos.pos[2]
+            << std::setprecision(2)
+            << " yaw=" << pos.rot[2] * 57.2957795f
+            << " pitch=" << pos.rot[0] * 57.2957795f
+            << " cell='" << player.getCell()->getCell()->getDescription() << "'"
+            << " gui=" << (winMgr->isGuiMode() ? static_cast<int>(winMgr->getMode()) : -1);
+
+        const MWWorld::Ptr focus = world->getFocusObject();
+        if (!focus.isEmpty())
+        {
+            const float* fp = focus.getRefData().getPosition().pos;
+            const float dx = fp[0] - pos.pos[0];
+            const float dy = fp[1] - pos.pos[1];
+            const float dz = fp[2] - pos.pos[2];
+            out << std::setprecision(1)
+                << " faced='" << focus.getClass().getName(focus) << "'"
+                << " fdist=" << std::sqrt(dx * dx + dy * dy + dz * dz);
+        }
+        else
+            out << " faced=none fdist=-1";
+
+        std::string hint;
+        {
+            std::lock_guard<std::mutex> lock(sDebugHintMutex);
+            hint = sDebugHint;
+        }
+        if (!hint.empty())
+        {
+            std::vector<MWWorld::Ptr> actors;
+            MWBase::Environment::get().getMechanicsManager()->getActorsInRange(
+                osg::Vec3f(pos.pos[0], pos.pos[1], pos.pos[2]), sDebugNearestRadius, actors);
+            const MWWorld::Ptr* best = nullptr;
+            float bestDist = 0.f;
+            const std::string needle = Misc::StringUtils::lowerCase(hint);
+            for (const MWWorld::Ptr& actor : actors)
+            {
+                if (actor == player || actor.isEmpty())
+                    continue;
+                if (Misc::StringUtils::lowerCase(std::string(actor.getClass().getName(actor))).find(needle)
+                    == std::string::npos)
+                    continue;
+                const float* ap = actor.getRefData().getPosition().pos;
+                const float dx = ap[0] - pos.pos[0];
+                const float dy = ap[1] - pos.pos[1];
+                const float d = std::sqrt(dx * dx + dy * dy);
+                if (best == nullptr || d < bestDist)
+                {
+                    best = &actor;
+                    bestDist = d;
+                }
+            }
+            if (best != nullptr)
+            {
+                const float* ap = best->getRefData().getPosition().pos;
+                const float bearing = normalizeAngleDeg(
+                    std::atan2(ap[0] - pos.pos[0], ap[1] - pos.pos[1]) * 57.2957795f
+                    - pos.rot[2] * 57.2957795f);
+                out << std::setprecision(1)
+                    << " target='" << best->getClass().getName(*best) << "'"
+                    << " tbearing=" << bearing << " tdist=" << bestDist;
+            }
+            else
+                out << " target=none tdist=-1";
+        }
+
+        Log(Debug::Info) << "[Android DebugState] " << out.str();
     }
 }
