@@ -893,8 +893,14 @@ namespace MWGui
 
     WindowBase* WindowManager::getActiveControllerWindow()
     {
-        if (!mCurrentModals.empty())
-            return mCurrentModals.back();
+        // OPENMW_ANDROID_051_CONTROLLER_MENU_DISPATCH
+        // Skip modals that were hidden without being popped: closing a menu
+        // while one of its confirmation dialogs is open can orphan the dialog
+        // in mCurrentModals, and an invisible modal would silently consume
+        // every controller button (its base handler reports "handled").
+        for (auto it = mCurrentModals.rbegin(); it != mCurrentModals.rend(); ++it)
+            if ((*it)->isVisible())
+                return *it;
 
         if (mWindows.empty())
             return nullptr;

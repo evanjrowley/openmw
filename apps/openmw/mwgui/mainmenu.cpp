@@ -210,6 +210,15 @@ namespace MWGui
 
     bool MainMenu::onControllerButtonEvent(const SDL_ControllerButtonEvent& arg)
     {
+        // OPENMW_ANDROID_051_CONTROLLER_MENU_DISPATCH
+        // The save/load dialog is owned by the main menu and is not part of
+        // any GuiModeState, so getActiveControllerWindow() always resolves to
+        // the main menu while the dialog is up. Forward the event so the
+        // dialog's own controller handler (dpad row selection, dpad left/
+        // right OK-vs-Cancel focus, A activate, B cancel, Y character) runs.
+        if (mSaveGameDialog && mSaveGameDialog->isVisible())
+            return mSaveGameDialog->onControllerButtonEvent(arg);
+
         if (arg.button == SDL_CONTROLLER_BUTTON_A)
         {
             MWBase::Environment::get().getWindowManager()->injectKeyPress(MyGUI::KeyCode::Space, 0, false);
@@ -229,7 +238,10 @@ namespace MWGui
         }
         else if (arg.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN)
         {
-            MWBase::Environment::get().getWindowManager()->injectKeyPress(MyGUI::KeyCode::Tab, 0, false);
+            // Shift+Tab (dpad up) moves focus backward; plain Tab does not
+            // move it forward here (nothing in the forward Tab chain picks up
+            // key focus on this menu), so step geometrically instead.
+            MWBase::Environment::get().getWindowManager()->injectKeyPress(MyGUI::KeyCode::ArrowDown, 0, false);
         }
         return true;
     }

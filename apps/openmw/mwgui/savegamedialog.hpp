@@ -26,6 +26,11 @@ namespace MWGui
 
         ControllerButtons* getControllerButtons() override;
 
+        // OPENMW_ANDROID_051_CONTROLLER_MENU_DISPATCH
+        // The dialog lives inside the MainMenu (outside every GuiModeState),
+        // so the main menu forwards controller events to it while visible.
+        bool onControllerButtonEvent(const SDL_ControllerButtonEvent& arg) override;
+
     private:
         void confirmDeleteSave();
 
@@ -70,7 +75,6 @@ namespace MWGui
         const MWState::Character* mCurrentCharacter;
         const MWState::Slot* mCurrentSlot;
 
-        bool onControllerButtonEvent(const SDL_ControllerButtonEvent& arg) override;
         bool mOkButtonFocus = true;
     };
 

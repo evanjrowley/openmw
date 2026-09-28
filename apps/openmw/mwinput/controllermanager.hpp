@@ -70,6 +70,12 @@ namespace MWInput
         bool mGamepadMousePressed;
         bool mLeftTriggerGuiPressed;
         bool mRightTriggerGuiPressed;
+        // OPENMW_ANDROID_051_CONTROLLER_CURSOR_ENGAGEMENT
+        // True while the left stick is actively driving the GUI cursor;
+        // cleared by any button press. Gates the "A acts as mouse click"
+        // fallthrough so window handlers (save dialog OK, etc.) still
+        // receive A when the cursor is not being steered.
+        bool mStickCursorActive;
     };
 }
 #endif

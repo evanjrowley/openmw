@@ -5,6 +5,8 @@
 
 #include <SDL.h>
 
+#include <typeinfo>
+
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/files/conversion.hpp>
@@ -35,6 +37,7 @@ namespace MWInput
         , mGamepadMousePressed(false)
         , mLeftTriggerGuiPressed(false)
         , mRightTriggerGuiPressed(false)
+        , mStickCursorActive(false)
     {
         if (!controllerBindingsFile.empty())
         {
@@ -271,11 +274,22 @@ namespace MWInput
 
         if (Settings::gui().mControllerMenus)
         {
-            // Update cursor state.
-            bool treatAsMouse = winMgr->getCursorVisible();
+            // OPENMW_ANDROID_051_CONTROLLER_CURSOR_ENGAGEMENT
+            // On Android getCursorVisible() keeps the menu cursor "visible"
+            // once shown (the absolute-touch bridge relies on that), so it
+            // cannot distinguish "the player is steering the stick cursor"
+            // from "a cursor happens to be on screen". Gate the A-as-mouse
+            // fallthrough on stick engagement instead: A clicks with the
+            // cursor only right after the stick moved it; any other button
+            // press re-engages per-window controller handling, so window
+            // handlers (save dialog OK, etc.) keep receiving buttons.
+            bool treatAsMouse = winMgr->getCursorVisible() && mStickCursorActive;
+            mStickCursorActive = false;
             winMgr->setCursorActive(false);
 
             MWGui::WindowBase* topWin = winMgr->getActiveControllerWindow();
+            Log(Debug::Info) << "[Android ControllerDispatch] button=" << arg.button << " topWin="
+                             << (topWin ? typeid(*topWin).name() : "(null)") << " treatAsMouse=" << treatAsMouse;
             if (topWin && topWin->isVisible())
             {
                 // When the inventory tooltip is visible, we don't actually want the A button to
@@ -407,6 +421,7 @@ namespace MWInput
                     // Treat the left stick like a cursor, which is the default behavior.
                     winMgr->setControllerTooltipVisible(false);
                     winMgr->setCursorVisible(true);
+                    mStickCursorActive = true;
                     return false;
                 }
 
