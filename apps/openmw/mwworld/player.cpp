@@ -35,6 +35,8 @@
 #include "class.hpp"
 #include "ptr.hpp"
 
+#include "../mwinput/androiddebug.hpp"
+
 namespace MWWorld
 {
     namespace
@@ -189,21 +191,35 @@ namespace MWWorld
     void Player::activate()
     {
         if (MWBase::Environment::get().getWindowManager()->isGuiMode())
+        {
+            MWInput::AndroidDebug::noteActivate("gui");
             return;
+        }
 
         MWWorld::Ptr player = getPlayer();
         const MWMechanics::NpcStats& playerStats = player.getClass().getNpcStats(player);
         if (playerStats.isParalyzed() || playerStats.getKnockedDown() || playerStats.isDead())
+        {
+            MWInput::AndroidDebug::noteActivate("paralyzed");
             return;
+        }
 
         MWWorld::Ptr toActivate = MWBase::Environment::get().getWorld()->getFocusObject();
 
         if (toActivate.isEmpty())
+        {
+            MWInput::AndroidDebug::noteActivate("no-target");
             return;
+        }
 
         if (!toActivate.getClass().hasToolTip(toActivate))
+        {
+            MWInput::AndroidDebug::noteActivate("no-tooltip");
             return;
+        }
 
+        MWInput::AndroidDebug::noteActivate(
+            "hit:" + std::string(toActivate.getClass().getName(toActivate)));
         MWBase::Environment::get().getLuaManager()->objectActivated(toActivate, player);
     }
 

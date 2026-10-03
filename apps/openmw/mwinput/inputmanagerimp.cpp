@@ -14,6 +14,7 @@
 #include "../mwworld/esmstore.hpp"
 
 #include "actionmanager.hpp"
+#include "androiddebug.hpp"
 #include "bindingsmanager.hpp"
 #include "controllermanager.hpp"
 #include "controlswitch.hpp"
@@ -81,6 +82,10 @@ namespace MWInput
         mSensorManager->update(dt);
         mActionManager->update(dt);
 
+        // OPENMW_ANDROID_051_DEBUG_CONTROL: servo primitives, scene census
+        // and streaming telemetry (engine thread, once per frame).
+        AndroidDebug::tick(dt, *mControllerManager);
+
         if (Settings::input().mEnableGyroscope)
         {
             bool controllerAvailable = mControllerManager->isGyroAvailable();
@@ -145,6 +150,10 @@ namespace MWInput
 
     bool InputManager::isIdle() const
     {
+        // OPENMW_ANDROID_051_DEBUG_CONTROL: the idle-orbit camera is driven
+        // from Lua via isIdle(); debug runs disable it for stable frames.
+        if (AndroidDebug::idleCamDisabled())
+            return false;
         return mActionManager->getIdleTime() > 0.5;
     }
 

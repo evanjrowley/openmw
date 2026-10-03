@@ -116,6 +116,10 @@ namespace MWRender
             SceneUtil::UnrefQueue& unrefQueue);
         ~RenderingManager();
 
+        // OPENMW_ANDROID_051_DEBUG_CONTROL: scene root for the debug
+        // target-marker overlay (mwrender/debugmarkers).
+        osg::Group* getRootNode() { return mRootNode.get(); }
+
         osgUtil::IncrementalCompileOperation* getIncrementalCompileOperation();
 
         MWRender::Objects& getObjects() override;

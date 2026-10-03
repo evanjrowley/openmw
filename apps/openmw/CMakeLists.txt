@@ -23,11 +23,11 @@ add_openmw_dir (mwrender
     bulletdebugdraw globalmap characterpreview camera localmap water terrainstorage ripplesimulation
     renderbin actoranimation landmanager navmesh actorspaths recastmesh fogmanager objectpaging groundcover
     postprocessor pingpongcull luminancecalculator pingpongcanvas transparentpass precipitationocclusion ripples
-    actorutil distortion animationpriority bonegroup blendmask animblendcontroller
+    actorutil distortion animationpriority bonegroup blendmask animblendcontroller debugmarkers
     )
 
 add_openmw_dir (mwinput
-    actions actionmanager bindingsmanager controllermanager controlswitch
+    actions actionmanager androiddebug bindingsmanager controllermanager controlswitch
     inputmanagerimp mousemanager keyboardmanager sensormanager gyromanager
     )
 

@@ -153,6 +153,9 @@ namespace MWInput
 
     void ControllerManager::buttonPressed(int deviceID, const SDL_ControllerButtonEvent& arg)
     {
+        // OPENMW_ANDROID_051_DEBUG_CONTROL: episode input capture.
+        AndroidDebug::noteInputButton(arg.button, true);
+
         if (!Settings::input().mEnableController || mBindingsManager->isDetectingBindingState())
             return;
 
@@ -198,6 +201,9 @@ namespace MWInput
 
     void ControllerManager::buttonReleased(int deviceID, const SDL_ControllerButtonEvent& arg)
     {
+        // OPENMW_ANDROID_051_DEBUG_CONTROL: episode input capture.
+        AndroidDebug::noteInputButton(arg.button, false);
+
         if (mBindingsManager->isDetectingBindingState())
         {
             mBindingsManager->controllerButtonReleased(deviceID, arg);
@@ -243,6 +249,9 @@ namespace MWInput
 
     void ControllerManager::axisMoved(int deviceID, const SDL_ControllerAxisEvent& arg)
     {
+        // OPENMW_ANDROID_051_DEBUG_CONTROL: episode input capture.
+        AndroidDebug::noteInputAxis(arg.axis, arg.value / 32767.f);
+
         if (mBindingsManager->isDetectingBindingState())
         {
             mBindingsManager->controllerAxisMoved(deviceID, arg);

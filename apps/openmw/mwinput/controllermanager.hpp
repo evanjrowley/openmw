@@ -8,6 +8,10 @@
 #include <components/sdlutil/events.hpp>
 #include <components/settings/settings.hpp>
 
+// OPENMW_ANDROID_051_DEBUG_CONTROL: noteInputAxis/noteInputButton
+// declarations (episode logger; implemented in androiddebug.cpp).
+#include "androiddebug.hpp"
+
 namespace MWInput
 {
     class BindingsManager;
